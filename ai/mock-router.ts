@@ -3,9 +3,9 @@ import {
   stepCountIs,
   simulateReadableStream,
   convertToModelMessages,
+  type LanguageModel,
   type UIMessage,
 } from "ai";
-import { MockLanguageModelV2 } from "ai/test";
 import { miitelTools, type MiitelToolName } from "@/tools";
 import type { Period } from "@/lib/miitel/types";
 
@@ -77,7 +77,17 @@ export function runMockChat(messages: UIMessage[]): Response {
 
   const { intro, toolName, input } = route(text);
 
-  const model = new MockLanguageModelV2({
+  // ニセLLM（最小の LanguageModelV2 実装）。
+  // ※ ai/test の MockLanguageModelV2 はテスト専用依存(msw/vitest)を
+  //    引き込み本番ビルドが壊れるため、ここで自前定義する。
+  const model = {
+    specificationVersion: "v2",
+    provider: "mock",
+    modelId: "mock-router",
+    supportedUrls: {},
+    doGenerate: async () => {
+      throw new Error("mock model is stream-only");
+    },
     doStream: async () => ({
       stream: simulateReadableStream({
         chunkDelayInMs: 20,
@@ -100,7 +110,7 @@ export function runMockChat(messages: UIMessage[]): Response {
         ],
       }),
     }),
-  });
+  } as unknown as LanguageModel;
 
   const result = streamText({
     model,
