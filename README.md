@@ -41,18 +41,37 @@ GenUI の「UI が切り替わる」挙動をすぐ確認できます。
 ```bash
 brew install ollama
 ollama serve
-ollama pull qwen2.5          # tool calling 対応モデル（llama3.1 でも可）
+ollama pull qwen3:32b        # 高精度の既定（48GB Mac 向け）
 ```
 
 ```bash
 # .env.local
 AI_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434/v1
-OLLAMA_MODEL=qwen2.5
+OLLAMA_MODEL=qwen3:32b
 ```
 
 LLM が発話を解釈して自分でツールを選びます。Ollama は OpenAI 互換 API を
 出すので、専用ライブラリは不要です。
+
+#### モデルの選び方（2026年時点・tool calling 観点）
+
+ツール呼び出しの安定性は **Qwen3 系が最も評価が高い**。Mac はユニファイド
+メモリが上限を決めるので、搭載メモリで選ぶ（サイズは Q4 量子化の目安）。
+
+| 用途 | モデル | サイズ目安 | 必要メモリ |
+|------|--------|-----------|-----------|
+| 軽量・手軽 | `qwen3:4b` / `qwen3:8b` | 3〜5GB | 8〜16GB |
+| 16GBの精度上限 | `qwen3:14b` / `gpt-oss:20b` | 9〜14GB | 16〜24GB |
+| **高精度（既定）** | **`qwen3:32b`** | ~20GB | **32〜48GB** |
+| 高精度＋高速 | `qwen3:30b-a3b` (MoE) | ~18GB | 32GB |
+| 最高精度 | `gpt-oss:120b` (MoE) | ~63GB | 64GB+ |
+
+- ツール精度はパラメータ数より**学習方法/アーキ**が効く。`gpt-oss` は
+  エージェント特化で精度が高い。
+- `gemma3` はツール呼び出しが弱めなのでエージェント用途では避ける。
+- `qwen3` は思考モードを持つが OpenAI 互換の tool calling 経由なら通常問題なし。
+  不安定なら入力末尾に `/no_think` を付けると思考を切れる。
 
 ### ③ Claude / OpenAI を使う（APIキーがある場合）
 
