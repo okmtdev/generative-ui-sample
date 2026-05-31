@@ -86,12 +86,43 @@ ANTHROPIC_MODEL=claude-sonnet-4-6
 
 データは既定で `lib/miitel/mock-data.ts` のダミーを使います。
 本番の MiiTel MCP（`https://mcp.miitel.ai/mcp` / Streamable HTTP / Bearer）に
-繋ぐ場合は `.env.local` に以下を追加します（**トークンはここだけに**）：
+繋ぐ場合は `.env.local` に設定を追加します（**秘密はここだけに**）。
+
+認証は 2 通り：
+
+**(推奨) access_key を置いてトークンを自動取得・更新**
+
+アクセストークンには有効期限があるため、`lib/miitel/auth.ts` が access_key から
+`authenticate` してトークンを取得し、期限が近づいたら自動で取り直します。
 
 ```bash
 MIITEL_MCP_URL=https://mcp.miitel.ai/mcp
-MIITEL_MCP_TOKEN=<本番MiiTelで発行したトークン>
+MIITEL_COMPANY_ID=...
+MIITEL_ACCESS_KEY_ID=...
+MIITEL_ACCESS_KEY_SECRET=...
+# MIITEL_AUTH_URL=https://api.miitel.com/api/auth/v2/authenticate  # 正しいベースURLは公式で確認
 ```
+
+**(簡易) 期限内の静的トークンを直接指定**（手元検証向け）
+
+```bash
+MIITEL_MCP_URL=https://mcp.miitel.ai/mcp
+MIITEL_MCP_TOKEN=<期限内のBearerトークン>   # 期限切れで401になる点に注意
+```
+
+### トークン（access_key）の取得
+
+MiiTel Open API の認証情報を使います。管理者権限で MiiTel 管理画面にログインし、
+API 連携設定でアクセスキー（`access_key_id` / `access_key_secret`）を発行 →
+`company_id` と合わせて `authenticate` でアクセストークンを取得する流れです。
+正確な発行場所・パラメータ名・有効期限は公式リファレンスで確認してください：
+
+- [MiiTel Open API Getting Started](https://developers.miitel.com/docs/miitel-open-api-getting-started)
+- [authenticate エンドポイント](https://developers.miitel.com/reference/authenticateauthenticationauthentication)
+
+> `lib/miitel/auth.ts` の `authenticate()` は、エンドポイント・パラメータ名・
+> レスポンスのフィールド名が公式と違う場合に数行で直せるよう TODO コメント付きで
+> 分離してあります。
 
 接続コードは `lib/miitel/mcp.ts` に用意済み。MiiTel MCP のツール名/スキーマが
 分かったら、型付きツールへのマッピング（`lib/miitel/client.ts` の TODO）か、
