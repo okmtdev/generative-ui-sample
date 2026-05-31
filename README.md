@@ -1,1 +1,148 @@
 # generative-ui-sample
+
+MiiTel の通話/会議データを題材にした **Generative UI** のサンプルアプリ。
+チャットに話しかけると、LLM が「どの UI を出すか」を判断してツールを呼び、
+その結果に応じて **React コンポーネントが動的に切り替わって描画**されます。
+
+```
+「今週のダッシュボード見せて」  → 集計カード + グラフ
+「クレームの通話を探して」      → フィルタ可能な履歴テーブル
+「call_1002 の詳細を教えて」     → 要約・感情スコア・文字起こしカード
+```
+
+設計の詳しい解説は [DESIGN.md](./DESIGN.md) を参照。
+
+## 必要なもの
+
+- Node.js 18.18+（推奨 20/22）
+- （任意）[Ollama](https://ollama.com/) … 本物の LLM をローカルで動かす場合
+
+## セットアップ
+
+```bash
+npm install
+cp .env.example .env.local   # まずはそのままでOK（AI_PROVIDER=mock）
+npm run dev                  # http://localhost:3000
+```
+
+`.env.local` の `AI_PROVIDER` で「頭脳(LLM)」を切り替えます。
+
+### ① まず動かす（鍵不要・LLM不要）— `mock`
+
+```bash
+AI_PROVIDER=mock
+```
+
+キーワードでツールを決め打ちするニセ頭脳。鍵もネットワークも不要で、
+GenUI の「UI が切り替わる」挙動をすぐ確認できます。
+
+### ② 本物の LLM をローカルで — `ollama`
+
+```bash
+brew install ollama
+ollama serve
+ollama pull qwen3:32b        # 高精度の既定（48GB Mac 向け）
+```
+
+```bash
+# .env.local
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_MODEL=qwen3:32b
+```
+
+LLM が発話を解釈して自分でツールを選びます。Ollama は OpenAI 互換 API を
+出すので、専用ライブラリは不要です。
+
+#### モデルの選び方（2026年時点・tool calling 観点）
+
+ツール呼び出しの安定性は **Qwen3 系が最も評価が高い**。Mac はユニファイド
+メモリが上限を決めるので、搭載メモリで選ぶ（サイズは Q4 量子化の目安）。
+
+| 用途 | モデル | サイズ目安 | 必要メモリ |
+|------|--------|-----------|-----------|
+| 軽量・手軽 | `qwen3:4b` / `qwen3:8b` | 3〜5GB | 8〜16GB |
+| 16GBの精度上限 | `qwen3:14b` / `gpt-oss:20b` | 9〜14GB | 16〜24GB |
+| **高精度（既定）** | **`qwen3:32b`** | ~20GB | **32〜48GB** |
+| 高精度＋高速 | `qwen3:30b-a3b` (MoE) | ~18GB | 32GB |
+| 最高精度 | `gpt-oss:120b` (MoE) | ~63GB | 64GB+ |
+
+- ツール精度はパラメータ数より**学習方法/アーキ**が効く。`gpt-oss` は
+  エージェント特化で精度が高い。
+- `gemma3` はツール呼び出しが弱めなのでエージェント用途では避ける。
+- `qwen3` は思考モードを持つが OpenAI 互換の tool calling 経由なら通常問題なし。
+  不安定なら入力末尾に `/no_think` を付けると思考を切れる。
+
+### ③ Claude / OpenAI を使う（APIキーがある場合）
+
+```bash
+# .env.local
+AI_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-sonnet-4-6
+```
+
+## MiiTel 実データへの接続（MCP）
+
+データは既定で `lib/miitel/mock-data.ts` のダミーを使います。
+本番の MiiTel MCP（`https://mcp.miitel.ai/mcp` / Streamable HTTP / Bearer）に
+繋ぐ場合は `.env.local` に設定を追加します（**秘密はここだけに**）。
+
+認証は 2 通り：
+
+**(推奨) access_key を置いてトークンを自動取得・更新**
+
+アクセストークンには有効期限があるため、`lib/miitel/auth.ts` が access_key から
+`authenticate` してトークンを取得し、期限が近づいたら自動で取り直します。
+
+```bash
+MIITEL_MCP_URL=https://mcp.miitel.ai/mcp
+MIITEL_COMPANY_ID=...
+MIITEL_ACCESS_KEY_ID=...
+MIITEL_ACCESS_KEY_SECRET=...
+# MIITEL_AUTH_URL=https://api.miitel.com/api/auth/v2/authenticate  # 正しいベースURLは公式で確認
+```
+
+**(簡易) 期限内の静的トークンを直接指定**（手元検証向け）
+
+```bash
+MIITEL_MCP_URL=https://mcp.miitel.ai/mcp
+MIITEL_MCP_TOKEN=<期限内のBearerトークン>   # 期限切れで401になる点に注意
+```
+
+### トークン（access_key）の取得
+
+MiiTel Open API の認証情報を使います。管理者権限で MiiTel 管理画面にログインし、
+API 連携設定でアクセスキー（`access_key_id` / `access_key_secret`）を発行 →
+`company_id` と合わせて `authenticate` でアクセストークンを取得する流れです。
+正確な発行場所・パラメータ名・有効期限は公式リファレンスで確認してください：
+
+- [MiiTel Open API Getting Started](https://developers.miitel.com/docs/miitel-open-api-getting-started)
+- [authenticate エンドポイント](https://developers.miitel.com/reference/authenticateauthenticationauthentication)
+
+> `lib/miitel/auth.ts` の `authenticate()` は、エンドポイント・パラメータ名・
+> レスポンスのフィールド名が公式と違う場合に数行で直せるよう TODO コメント付きで
+> 分離してあります。
+
+接続コードは `lib/miitel/mcp.ts` に用意済み。MiiTel MCP のツール名/スキーマが
+分かったら、型付きツールへのマッピング（`lib/miitel/client.ts` の TODO）か、
+MCP ツールを直接モデルへ渡す方式のどちらかを有効化してください。詳細は
+[DESIGN.md](./DESIGN.md) の「データの差し替え」を参照。
+
+## 構成
+
+```
+app/
+  page.tsx            チャットUI（useChat）＋ツール結果の描画
+  api/chat/route.ts   頭脳(LLM)＋ツールを束ねるサーバ
+ai/
+  provider.ts         AI_PROVIDER で LLM を選択
+  mock-router.ts      鍵不要のニセ頭脳（キーワード→tool-call）
+tools/index.ts        ★GenUIの本体: 各ツール=1コンポーネント
+components/genui/      描画される React 部品 + registry
+lib/miitel/            データ層（型 / Mock / MCP接続 / 抽象）
+```
+
+> 注: このリポジトリは npm が使えない環境で作成したため、作者環境での
+> 起動確認は未実施です。`npm install` 時に AI SDK のバージョン差異で
+> 微修正が要る可能性があります（その場合は README に追記してください）。
