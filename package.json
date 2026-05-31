@@ -1,0 +1,29 @@
+{
+  "name": "generative-ui-sample",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MiiTel を題材にした Generative UI のサンプル。LLM がツールを選び、結果に応じて React コンポーネントが動的に描画される。",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.0",
+    "@ai-sdk/openai": "^2.0.0",
+    "@ai-sdk/react": "^2.0.0",
+    "@modelcontextprotocol/sdk": "^1.13.0",
+    "ai": "^5.0.0",
+    "next": "^15.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "typescript": "^5.7.0"
+  }
+}
